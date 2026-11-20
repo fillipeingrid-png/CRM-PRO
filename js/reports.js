@@ -13,7 +13,7 @@ function periodRange(p, from, to) {
   }
 }
 
-const repState = { p: 'mes', tipo: 'vendas', from: '', to: '' };
+const repState = { p: 'mes', tipo: 'vendas', from: '', to: '', func: '' };
 
 function hbars(rows, fmt = money) {
   if (!rows.length) return `<p class="empty-sm">Sem dados no período.</p>`;
@@ -54,6 +54,7 @@ function reportsPage() {
         </div>
         <div class="field"><label>Tipo de registro</label><select class="input" data-tipo>
           <option value="vendas">Vendas</option><option value="pedidos">Pedidos</option><option value="orcamentos">Orçamentos</option><option value="todos">Vendas + Pedidos + Orçamentos</option></select></div>
+        ${isManager() ? `<div class="field"><label>Funcionário</label><select class="input" data-func><option value="">Todos</option>${Store.all('usuarios').map(u => `<option value="${u.id}" ${u.id === repState.func ? 'selected' : ''}>${esc(u.nome)}</option>`).join('')}</select></div>` : ''}
       </div>
       <div data-out></div>`,
     mount(root) {
@@ -64,7 +65,7 @@ function reportsPage() {
         root.querySelector('[data-tipo]').value = repState.tipo;
         const [a, b] = periodRange(repState.p, repState.from, repState.to);
         const cols = repState.tipo === 'todos' ? Object.keys(REC) : [repState.tipo];
-        const all = cols.flatMap(c => Store.all(c).map(r => ({ ...r, _ent: c }))).filter(r => r.data >= a && r.data <= b);
+        const all = cols.flatMap(c => visibleRecs(c).map(r => ({ ...r, _ent: c }))).filter(r => r.data >= a && r.data <= b && (!repState.func || r.funcionarioId === repState.func));
         const valid = all.filter(r => !isCancelled(r));
         const fat = valid.reduce((s, r) => s + recTotals(r).total, 0);
         const ticket = valid.length ? fat / valid.length : 0;
@@ -122,6 +123,7 @@ function reportsPage() {
       };
       root.querySelector('[data-period]').onclick = e => { const b = e.target.closest('[data-p]'); if (b) { repState.p = b.dataset.p; draw(); } };
       root.querySelector('[data-tipo]').onchange = e => { repState.tipo = e.target.value; draw(); };
+      root.querySelector('[data-func]')?.addEventListener('change', e => { repState.func = e.target.value; draw(); });
       root.querySelector('[data-from]').onchange = e => { repState.from = e.target.value; draw(); };
       root.querySelector('[data-to]').onchange = e => { repState.to = e.target.value; draw(); };
       draw();

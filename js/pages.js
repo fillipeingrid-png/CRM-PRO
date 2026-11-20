@@ -27,14 +27,14 @@ function homePage() {
   const h = now.getHours();
   const greet = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
   const ym = todayISO().slice(0, 7);
-  const monthTotal = Object.keys(REC).flatMap(c => Store.all(c)).filter(r => r.data?.startsWith(ym) && !isCancelled(r)).reduce((s, r) => s + recTotals(r).total, 0);
+  const monthTotal = Object.keys(REC).flatMap(c => visibleRecs(c)).filter(r => r.data?.startsWith(ym) && !isCancelled(r)).reduce((s, r) => s + recTotals(r).total, 0);
   const agHoje = Store.all('agendamentos').filter(a => a.data === todayISO() && a.situacao !== 'Cancelado').length;
-  const pedPend = Store.all('pedidos').filter(p => ['Pendente', 'Em Andamento'].includes(p.situacao)).length;
-  const orcPend = Store.all('orcamentos').filter(p => p.situacao === 'Pendente').length;
+  const pedPend = visibleRecs('pedidos').filter(p => ['Pendente', 'Em Andamento'].includes(p.situacao)).length;
+  const orcPend = visibleRecs('orcamentos').filter(p => p.situacao === 'Pendente').length;
   const cli = Store.all('clientes').length;
   const vencidas = Store.all('cobrancas').filter(x => cobrancaStatus(x) === 'Vencida');
   const proximos = Store.all('agendamentos').filter(a => a.data >= todayISO() && !['Cancelado', 'Concluído'].includes(a.situacao)).sort((a, b) => (a.data + (a.hora || '')).localeCompare(b.data + (b.hora || ''))).slice(0, 3);
-  const recentes = Object.keys(REC).flatMap(c => Store.all(c).map(r => ({ ...r, _ent: c }))).sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || '')).slice(0, 4);
+  const recentes = Object.keys(REC).flatMap(c => visibleRecs(c).map(r => ({ ...r, _ent: c }))).sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || '')).slice(0, 4);
 
   const stat = (n, label, ic, tone, href) => `<a class="stat card" href="${href}"><span class="circle ${tone}">${icon(ic)}</span><div><b>${n}</b><span>${label}</span></div></a>`;
   const quick = (l, ic, tone, href) => `<a class="quick" href="${href}"><span class="circle xl ${tone}">${icon(ic)}</span><span>${l}</span></a>`;
@@ -64,6 +64,7 @@ function homePage() {
           ${quick('Novo agend.', 'event', 'purple', '#/form/agendamentos')}
         </div>
       </section>
+      ${teamActivityCard()}
       ${proximos.length ? `<section class="card pad"><h3 class="card-h caps">Próximos agendamentos</h3>
         ${proximos.map(a => `<a class="mini-row" href="#/form/agendamentos/${a.id}"><span class="date-pill"><b>${a.data.slice(8, 10)}</b>${MESES[+a.data.slice(5, 7) - 1].slice(0, 3)}</span><div><strong>${esc(a.titulo)}</strong><small>${esc(a.hora || '')} ${esc(clientName(a.clienteId))}</small></div>${badge(a.situacao)}</a>`).join('')}</section>` : ''}
       ${recentes.length ? `<section class="card pad"><h3 class="card-h caps">Últimos registros</h3>
@@ -77,12 +78,12 @@ const MENU = [
   ['CADASTROS', [['Clientes', 'people', '#/list/clientes', 'blue'], ['Produtos', 'tag', '#/list/produtos', 'blue'], ['Serviços', 'list', '#/list/servicos', 'blue'], ['Usuários', 'users', '#/list/usuarios', 'blue']]],
   ['OPERAÇÃO', [['Pedidos', 'ticket', '#/list/pedidos', 'green'], ['Orçamentos', 'doc', '#/list/orcamentos', 'green'], ['Vendas', 'payments', '#/list/vendas', 'green'], ['Agendamentos', 'calendar', '#/list/agendamentos', 'green']]],
   ['FINANCEIRO', [['Cobrança', 'money', '#/list/cobrancas', 'orange'], ['Relatórios', 'chart', '#/reports', 'orange']]],
-  ['CONTA E CONFIGURAÇÕES', [['Plano PRO', 'star', '#/plan', 'gold'], ['Personalizar Documentos', 'doc', '#/docs', 'slate'], ['Versão Web', 'computer', '#/web', 'slate'], ['Configurações', 'wrench', '#/settings', 'slate']]],
+  ['CONTA E CONFIGURAÇÕES', [['Painel do Gestor', 'eye', '#/activity', 'blue', true], ['Plano PRO', 'star', '#/plan', 'gold'], ['Personalizar Documentos', 'doc', '#/docs', 'slate'], ['Versão Web', 'computer', '#/web', 'slate'], ['Configurações', 'wrench', '#/settings', 'slate']]],
 ];
 function menuPage() {
   return {
     main: true, nav: 'menu',
-    body: MENU.map(([sec, items]) => `<h3 class="sec">${sec}</h3><div class="tiles">${items.map(([l, ic, href, tone]) => `
+    body: MENU.map(([sec, items]) => `<h3 class="sec">${sec}</h3><div class="tiles">${items.filter(i => !i[4] || isManager()).map(([l, ic, href, tone]) => `
       <a class="tile card ${tone === 'gold' ? 'gold' : ''}" href="${href}"><span class="circle xl ${tone}">${icon(ic)}</span><span>${l}</span></a>`).join('')}</div>`).join(''),
   };
 }
@@ -115,7 +116,7 @@ function listPage(ent) {
 
   const filtered = () => {
     const q = norm(ls.q);
-    let arr = Store.all(ent).slice();
+    let arr = (isRec ? visibleRecs(ent) : ent === 'usuarios' && !isManager() ? Store.all(ent).filter(u => u.id === Store.user().id) : Store.all(ent)).slice();
     if (isRec) {
       arr = arr.filter(x => !q || norm(recNumber(ent, x) + ' ' + x.numero + ' ' + clientName(x.clienteId)).includes(q));
       if (ls.f) arr = arr.filter(x => x.situacao === ls.f);
@@ -175,8 +176,8 @@ function entityFormPage(ent, id) {
   const x = id ? Store.get(ent, id) : null;
   if (id && !x) return notFound();
   const me = Store.user();
-  if (ent === 'usuarios' && me.papel !== 'Administrador' && (!x || x.id !== me.id)) {
-    return { title: 'Usuários', back: true, body: `<div class="empty">${icon('lock')}<p>Somente administradores podem cadastrar ou editar outros usuários.</p></div>` };
+  if (ent === 'usuarios' && !isManager(me) && (!x || x.id !== me.id)) {
+    return { title: 'Usuários', back: true, body: `<div class="empty">${icon('lock')}<p>Somente o gestor pode cadastrar ou editar outros usuários.</p></div>` };
   }
   const fields = D.fields.filter(f => !(ent === 'usuarios' && f.k === 'senha' && x));
 
@@ -234,7 +235,7 @@ function entityFormPage(ent, id) {
 }
 
 function clientHistory(c) {
-  const recs = Object.keys(REC).flatMap(e => Store.all(e).filter(r => r.clienteId === c.id).map(r => ({ ...r, _ent: e }))).sort((a, b) => b.data.localeCompare(a.data));
+  const recs = Object.keys(REC).flatMap(e => visibleRecs(e).filter(r => r.clienteId === c.id).map(r => ({ ...r, _ent: e }))).sort((a, b) => b.data.localeCompare(a.data));
   const total = recs.filter(r => r._ent !== 'orcamentos' && !isCancelled(r)).reduce((s, r) => s + recTotals(r).total, 0);
   const aberto = Store.all('cobrancas').filter(x => x.clienteId === c.id && !x.pago).reduce((s, x) => s + x.valor, 0);
   return `<section class="card pad">
@@ -273,12 +274,12 @@ function docsPage() {
     mount(root) {
       root.querySelector('[data-file]').onchange = async e => {
         const f = e.target.files[0]; if (!f) return;
-        try { Store.d.settings.logo = await resizeImage(f); Store.save(); toast('Logo atualizada.'); render(); } catch { toast('Não foi possível ler a imagem.', 'err'); }
+        try { Store.d.settings.logo = await resizeImage(f); Store.save(); Audit.add('config', 'Trocou a logo dos documentos'); toast('Logo atualizada.'); render(); } catch { toast('Não foi possível ler a imagem.', 'err'); }
       };
       root.querySelector('[data-rmlogo]')?.addEventListener('click', () => { Store.d.settings.logo = ''; Store.save(); render(); });
       root.querySelector('[data-save]').onclick = () => {
         Object.assign(Store.d.settings, formValues(root.querySelector('[data-f]')));
-        Store.save(); toast('Documentos personalizados!');
+        Store.save(); Audit.add('config', 'Alterou Personalizar Documentos'); toast('Documentos personalizados!');
       };
     },
   };
@@ -287,7 +288,7 @@ function docsPage() {
 /* ---------- Configurações ---------- */
 function settingsPage() {
   const counts = ['clientes', 'produtos', 'servicos', 'vendas', 'pedidos', 'orcamentos', 'agendamentos', 'cobrancas'].map(c => `${(REC[c] || ENT[c]).label}: ${Store.all(c).length}`).join(' · ');
-  const isAdmin = Store.user().papel === 'Administrador';
+  const isAdmin = isManager();
   return {
     title: 'Configurações', back: true, icon: 'wrench',
     body: `
@@ -307,11 +308,11 @@ function settingsPage() {
         <button class="btn danger block" data-reset>${icon('delete')} Apagar todos os dados</button></section>` : ''}
       <section class="card pad"><h3 class="card-h">Sobre</h3><p class="hint">CRM PRO · versão ${APP_VERSION}<br>App offline (PWA). Funciona sem internet depois de aberto a primeira vez.</p></section>`,
     mount(root) {
-      root.querySelector('[data-exp]').onclick = () => { download(`crm-pro-backup-${todayISO()}.json`, Store.exportJSON()); toast('Backup exportado.'); };
+      root.querySelector('[data-exp]').onclick = () => { Audit.add('backup', 'Exportou backup dos dados'); download(`crm-pro-backup-${todayISO()}.json`, Store.exportJSON()); toast('Backup exportado.'); };
       root.querySelector('[data-imp]').onchange = async e => {
         const f = e.target.files[0]; if (!f) return;
         if (!await confirmDlg('Restaurar o backup substitui TODOS os dados atuais. Continuar?', { ok: 'Restaurar', danger: true })) return;
-        try { Store.importJSON(await f.text()); toast('Backup restaurado!'); if (!Store.user()) Store.logout(); boot(); }
+        try { Store.importJSON(await f.text()); Audit.add('backup', 'Restaurou um backup', { det: f.name }); toast('Backup restaurado!'); if (!Store.user()) Store.logout(); boot(); }
         catch (err) { toast('Arquivo inválido: ' + err.message, 'err'); }
       };
       root.querySelector('[data-demo]').onclick = async () => {
@@ -423,7 +424,7 @@ function authScreen() {
       <div class="auth-brand"><span class="auth-logo">${icon('receipt')}</span><h1>CRM PRO</h1><p>Clientes, vendas e cobranças na palma da mão</p></div>
       <form class="auth-card card" data-f novalidate>
         <h2>${first ? 'Criar sua conta' : 'Entrar'}</h2>
-        ${first ? `<p class="hint">Primeiro acesso neste aparelho. Esta conta será o administrador.</p>${fieldHTML({ k: 'nome', l: 'Nome de usuário', ph: 'Como você quer ser chamado' })}${fieldHTML({ k: 'empresa', l: 'Nome da empresa (opcional)' })}` : ''}
+        ${first ? `<p class="hint">Primeiro acesso neste aparelho. Esta conta será a do <b>gestor</b>, que vê tudo o que os usuários fazem.</p>${fieldHTML({ k: 'nome', l: 'Nome de usuário', ph: 'Como você quer ser chamado' })}${fieldHTML({ k: 'empresa', l: 'Nome da empresa (opcional)' })}` : ''}
         ${fieldHTML({ k: 'email', l: 'E-mail', type: 'email', ph: 'seu@email.com' })}
         ${fieldHTML({ k: 'senha', l: 'Senha', type: 'password', ph: first ? 'Mínimo 4 caracteres' : '' })}
         <button class="btn primary block xl" type="submit">${first ? 'CRIAR CONTA' : 'ENTRAR'}</button>
@@ -438,13 +439,18 @@ function authScreen() {
     if (first) {
       if (!v.nome) return toast('Informe o nome de usuário.', 'err');
       if (v.senha.length < 4) return toast('A senha precisa ter ao menos 4 caracteres.', 'err');
-      const u = Store.put('usuarios', { nome: v.nome, email: v.email, papel: 'Administrador', senhaHash: await hashPass(v.email, v.senha) });
+      const u = Store.put('usuarios', { nome: v.nome, email: v.email, papel: 'Gestor', senhaHash: await hashPass(v.email, v.senha) }, { silent: true });
       if (v.empresa) { Store.d.settings.empresa = v.empresa; Store.d.settings.email = v.email; Store.save(); }
       Store.login(u);
+      Audit.add('criou', `Conta do gestor “${u.nome}” criada`, { col: 'usuarios', refId: u.id });
     } else {
       const u = Store.all('usuarios').find(x => norm(x.email) === norm(v.email));
-      if (!u || u.senhaHash !== await hashPass(v.email, v.senha)) return toast('E-mail ou senha incorretos.', 'err');
+      if (!u || u.senhaHash !== await hashPass(v.email, v.senha)) {
+        Audit.add('falhou', `Tentativa de login com ${v.email}`, { uid: u?.id || '', unome: u?.nome || v.email });
+        return toast('E-mail ou senha incorretos.', 'err');
+      }
       Store.login(u);
+      Audit.add('entrou', 'Entrou no app');
     }
     document.body.classList.remove('auth');
     location.hash = '#/home';

@@ -7,7 +7,7 @@ const Store = {
     return {
       usuarios: [], clientes: [], produtos: [], servicos: [],
       vendas: [], pedidos: [], orcamentos: [], agendamentos: [], cobrancas: [],
-      seq: {},
+      seq: {}, log: [],
       settings: {
         empresa: '', documento: '', telefone: '', email: '', endereco: '',
         rodape: 'Obrigado pela preferência!', validade: 7, cor: '#1565c0', logo: '',
@@ -21,6 +21,7 @@ const Store = {
     const def = this.defaults();
     this.d = Object.assign(def, raw);
     this.d.settings = Object.assign(def.settings, raw.settings || {});
+    this.d.usuarios.forEach(u => { if (u.papel === 'Administrador') u.papel = 'Gestor'; });
   },
   save() {
     try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); return true; }
@@ -28,17 +29,28 @@ const Store = {
   },
   all(c) { return (this.d[c] ||= []); },
   get(c, id) { return this.all(c).find(x => x.id === id); },
-  put(c, obj) {
+  put(c, obj, { silent = false } = {}) {
     const arr = this.all(c);
     const now = new Date().toISOString();
     if (obj.id) {
       const i = arr.findIndex(x => x.id === obj.id);
-      if (i >= 0) { arr[i] = { ...arr[i], ...obj, atualizadoEm: now }; this.save(); return arr[i]; }
+      if (i >= 0) {
+        const before = arr[i];
+        arr[i] = { ...before, ...obj, atualizadoEm: now }; this.save();
+        if (!silent) window.Audit?.onChange(c, 'editou', before, arr[i]);
+        return arr[i];
+      }
     }
     const o = { ...obj, id: obj.id || uid(), criadoEm: now, atualizadoEm: now };
-    arr.push(o); this.save(); return o;
+    arr.push(o); this.save();
+    if (!silent) window.Audit?.onChange(c, 'criou', null, o);
+    return o;
   },
-  del(c, id) { this.d[c] = this.all(c).filter(x => x.id !== id); this.save(); },
+  del(c, id) {
+    const before = this.get(c, id);
+    this.d[c] = this.all(c).filter(x => x.id !== id); this.save();
+    if (before) window.Audit?.onChange(c, 'excluiu', before, null);
+  },
   next(key) { this.d.seq[key] = (this.d.seq[key] || 0) + 1; return this.d.seq[key]; },
 
   /* Sessão */

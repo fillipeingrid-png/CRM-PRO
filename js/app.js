@@ -1,12 +1,12 @@
 /* Shell do app: roteador, barra superior, menu lateral e navegação inferior */
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 let navDepth = 0;
 
 const DRAWER = [
   [null, [['Início', 'home', '#/home'], ['Clientes', 'people', '#/list/clientes'], ['Agendamentos', 'calendar', '#/list/agendamentos']]],
   ['VENDAS', [['Pedidos', 'ticket', '#/list/pedidos'], ['Orçamentos', 'doc', '#/list/orcamentos'], ['Vendas', 'payments', '#/list/vendas'], ['Cobrança', 'money', '#/list/cobrancas'], ['Relatórios', 'chart', '#/reports']]],
   ['CADASTROS', [['Produtos', 'tag', '#/list/produtos'], ['Serviços', 'list', '#/list/servicos'], ['Usuários', 'users', '#/list/usuarios']]],
-  ['CONTA', [['Plano PRO', 'star', '#/plan', 'gold'], ['Personalizar Documentos', 'doc', '#/docs'], ['Alterar senha', 'lock', '#/password'], ['Configurações', 'wrench', '#/settings']]],
+  ['CONTA', [['Painel do Gestor', 'eye', '#/activity', '', true], ['Plano PRO', 'star', '#/plan', 'gold'], ['Personalizar Documentos', 'doc', '#/docs'], ['Alterar senha', 'lock', '#/password'], ['Configurações', 'wrench', '#/settings']]],
 ];
 
 function resolvePage() {
@@ -23,6 +23,7 @@ function resolvePage() {
     case 'plan': return planPage();
     case 'web': return webPage();
     case 'password': return passwordPage();
+    case 'activity': return activityPage();
     default: return notFound();
   }
 }
@@ -86,7 +87,7 @@ function openDrawer() {
   const cur = location.hash || '#/home';
   $('#drawer .drawer-panel').innerHTML = `
     <div class="drawer-head"><span class="avatar">${esc((u.nome || '?')[0].toUpperCase())}</span><b>${esc(u.nome)}</b><small>${esc(u.email)}</small></div>
-    <nav class="drawer-list">${DRAWER.map(([sec, items]) => `${sec ? `<h4>${sec}</h4>` : ''}${items.map(([l, ic, href, tone]) => `<a href="${href}" class="${cur === href ? 'on' : ''} ${tone || ''}">${icon(ic)}<span>${l}</span></a>`).join('')}`).join('')}</nav>
+    <nav class="drawer-list">${DRAWER.map(([sec, items]) => `${sec ? `<h4>${sec}</h4>` : ''}${items.filter(i => !i[4] || isManager()).map(([l, ic, href, tone]) => `<a href="${href}" class="${cur === href ? 'on' : ''} ${tone || ''}">${icon(ic)}<span>${l}</span></a>`).join('')}`).join('')}</nav>
     <div class="drawer-foot"><button class="logout" data-logout>${icon('logout')}<span>Sair da conta</span></button><small>Versão ${APP_VERSION}</small></div>`;
   $('#drawer').classList.add('open');
   $('#drawer').setAttribute('aria-hidden', 'false');
@@ -97,6 +98,7 @@ function closeDrawer() { $('#drawer').classList.remove('open'); $('#drawer').set
 async function logout() {
   closeDrawer();
   if (!await confirmDlg('Deseja sair da conta?', { ok: 'Sair' })) return;
+  Audit.add('saiu', 'Saiu do app');
   Store.logout(); location.hash = '#/home'; render();
 }
 
@@ -109,7 +111,7 @@ function kebab() {
       <a href="#/web">${icon('computer')} Versão Web / Instalar</a>
       <button data-out class="danger">${icon('logout')} Sair da conta</button></div>`,
     onMount(el, api) {
-      el.querySelector('[data-exp]').onclick = () => { download(`crm-pro-backup-${todayISO()}.json`, Store.exportJSON()); api.close(); toast('Backup exportado.'); };
+      el.querySelector('[data-exp]').onclick = () => { Audit.add('backup', 'Exportou backup dos dados'); download(`crm-pro-backup-${todayISO()}.json`, Store.exportJSON()); api.close(); toast('Backup exportado.'); };
       el.querySelector('[data-out]').onclick = () => { api.close(); logout(); };
     },
   });

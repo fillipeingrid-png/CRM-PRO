@@ -77,6 +77,7 @@ function recordFormPage(ent, id) {
   const R = REC[ent];
   const existing = id ? Store.get(ent, id) : null;
   if (id && !existing) return notFound();
+  if (existing && !canSeeRec(existing)) return noAccess();
   const user = Store.user();
   const st = existing ? JSON.parse(JSON.stringify(existing)) : {
     data: todayISO(), clienteId: '', situacao: R.status[0], obs: '', itens: [], desconto: 0, acrescimo: 0, pagamento: '',
@@ -257,6 +258,7 @@ function docPage(ent, id) {
   const R = REC[ent];
   const r = Store.get(ent, id);
   if (!r) return notFound();
+  if (!canSeeRec(r)) return noAccess();
   const s = Store.d.settings;
   const c = Store.get('clientes', r.clienteId) || { nome: '—' };
   const t = recTotals(r);
@@ -310,8 +312,8 @@ function docPage(ent, id) {
       root.querySelector('.doc-actions').onclick = async e => {
         const b = e.target.closest('[data-act]'); if (!b) return;
         const act = b.dataset.act;
-        if (act === 'print') window.print();
-        if (act === 'whats') shareWhats(ent, r, c, t);
+        if (act === 'print') { Audit.add('imprimiu', Audit.describe(ent, r), { col: ent, refId: r.id }); window.print(); }
+        if (act === 'whats') { Audit.add('compartilhou', Audit.describe(ent, r), { col: ent, refId: r.id, det: 'pelo WhatsApp' }); shareWhats(ent, r, c, t); }
         if (act === 'dup') {
           const copy = JSON.parse(JSON.stringify(r));
           delete copy.id; delete copy.baixas;
@@ -385,4 +387,8 @@ function chargeDialog(ent, r, total) {
       };
     },
   });
+}
+
+function noAccess() {
+  return { title: 'Sem acesso', back: true, body: `<div class="empty">${icon('lock')}<p>Este registro é de outro vendedor. Somente o gestor pode abri-lo.</p></div>` };
 }

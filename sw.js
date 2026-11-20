@@ -1,7 +1,7 @@
 /* Service worker: cache do app para funcionar offline */
-const CACHE = 'crmpro-v1.0.0';
+const CACHE = 'crmpro-v1.1.0';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'css/styles.css', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
-  'js/icons.js', 'js/util.js', 'js/store.js', 'js/entities.js', 'js/records.js', 'js/reports.js', 'js/pages.js', 'js/app.js'];
+  'js/icons.js', 'js/util.js', 'js/store.js', 'js/entities.js', 'js/records.js', 'js/reports.js', 'js/audit.js', 'js/pages.js', 'js/app.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

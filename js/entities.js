@@ -54,7 +54,7 @@ const ENT = {
     fields: [
       { k: 'nome', l: 'Nome de usuário', req: true },
       { k: 'email', l: 'E-mail (login)', type: 'email', req: true },
-      { k: 'papel', l: 'Perfil', type: 'select', opts: ['Vendedor', 'Administrador'] },
+      { k: 'papel', l: 'Perfil', type: 'select', opts: ['Vendedor', 'Gestor'] },
       { k: 'senha', l: 'Senha', type: 'password', ph: 'Mínimo 4 caracteres' },
     ],
     title: x => x.nome,
