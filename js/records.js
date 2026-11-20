@@ -271,7 +271,7 @@ function docPage(ent, id) {
     tabs: [{ l: 'Cadastro', href: `#/form/${ent}/${id}` }, { l: 'Documento', active: true }],
     body: `
       <div class="doc-actions">
-        <button class="btn primary" data-act="print">${icon('print')} Imprimir / PDF</button>
+        ${EMBEDDED ? '' : `<button class="btn primary" data-act="print">${icon('print')} Imprimir / PDF</button>`}
         <button class="btn green" data-act="whats">${icon('share')} WhatsApp</button>
         ${conv}${cob}
         <button class="btn outline" data-act="dup">${icon('copy')} Duplicar</button>
@@ -350,7 +350,7 @@ function shareWhats(ent, r, c, t) {
   const text = lines.join('\n');
   let phone = String(c.telefone || '').replace(/\D/g, '');
   if (phone && phone.length <= 11) phone = '55' + phone;
-  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+  openExternal(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
 }
 
 function chargeDialog(ent, r, total) {

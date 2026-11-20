@@ -294,6 +294,7 @@ function settingsPage() {
       <section class="card pad"><h3 class="card-h">Backup dos dados</h3>
         <p class="hint">Os dados ficam salvos <b>neste aparelho</b>. Faça backups com frequência e use o arquivo para restaurar ou levar para outro aparelho.</p>
         <p class="hint small">${counts}</p>
+        ${EMBEDDED ? '<p class="hint small"><b>Modo de teste:</b> nesta página de teste o download do backup pode não funcionar. Na versão publicada do site ele funciona normalmente.</p>' : ''}
         <div class="btn-col">
           <button class="btn primary" data-exp>${icon('download')} Exportar backup</button>
           <label class="btn outline">${icon('upload')} Restaurar backup<input type="file" accept=".json,application/json" hidden data-imp></label>

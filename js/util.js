@@ -132,3 +132,13 @@ function download(filename, text, type = 'application/json') {
   a.download = filename; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
+
+/* Rodando dentro de um quadro (ex.: página de teste): impressão e downloads podem não funcionar */
+const EMBEDDED = (() => { try { return window.self !== window.top; } catch { return true; } })();
+
+/* Abre link externo com um <a> real (funciona também dentro de quadros) */
+function openExternal(url) {
+  const a = document.createElement('a');
+  a.href = url; a.target = '_blank'; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+}
